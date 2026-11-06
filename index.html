@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MeroLink - Gerenciador de Canhotos</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- JSZip para Download em Lote ZIP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- jsPDF para Geração Dinâmica de PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Google Fonts Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    /* Estilização customizada de scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.5);
+      border-radius: 9999px;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: rgba(75, 85, 99, 0.5);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200 flex flex-col">
+
+  <!-- Cabeçalho Principal -->
+  <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-brand-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
+          <i class="fa-solid fa-receipt text-xl"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight text-slate-900 dark:text-white">MeroLink</h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Captura e Organização Logística</p>
+        </div>
+      </div>
+      
+      <!-- Ações de Cabeçalho -->
+      <div class="flex items-center space-x-2 sm:space-x-4">
+        <!-- Indicador de total -->
+        <span id="badge-total" class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-800 dark:bg-brand-900/50 dark:text-brand-300">
+          <i class="fa-solid fa-folder text-xs mr-1.5"></i> <span id="total-count">0</span> Canhotos
+        </span>
+
+        <!-- Alternador de Tema -->
+        <button id="btn-theme" onclick="toggleDarkMode()" class="p-2.5 rounded-xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition" title="Alternar Tema">
+          <i class="fa-solid fa-moon dark:hidden text-lg"></i>
+          <i class="fa-solid fa-sun hidden dark:inline text-lg text-amber-400"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Conteúdo Principal -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Painel Esquerdo: Captura e Formuário -->
+    <section class="lg:col-span-5 flex flex-col space-y-5">
+      <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 sm:p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <i class="fa-solid fa-camera text-brand-600 dark:text-brand-500"></i> Capturar Canhoto
+          </h2>
+          <span class="text-xs text-slate-400">Etapa 1 de 2</span>
+        </div>
+
+        <!-- Área da Câmera ou Preview Inicial -->
+        <div class="relative bg-slate-950 rounded-xl overflow-hidden aspect-[4/3] flex items-center justify-center border border-slate-700 shadow-inner group">
+          
+          <!-- Elemento de Imagem Capturada/Carregada -->
+          <img id="image-preview" class="hidden w-full h-full object-contain bg-black" alt="Pré-visualização do canhoto">
+
+          <!-- Placeholder Quando Vazio -->
+          <div id="preview-placeholder" class="text-center p-6 flex flex-col items-center">
+            <div class="w-14 h-14 rounded-full bg-slate-800/80 text-slate-400 flex items-center justify-center mb-3">
+              <i class="fa-solid fa-image text-2xl"></i>
+            </div>
+            <p class="text-sm font-medium text-slate-300">Nenhuma foto selecionada</p>
+            <p class="text-xs text-slate-500 mt-1">Tire uma foto ou escolha um arquivo digitalizado</p>
+          </div>
+        </div>
+
+        <!-- Botões de Ação de Captura/Upload (Compatível com qualquer navegador/HTTPS/File) -->
+        <div class="grid grid-cols-2 gap-3">
+          <label class="py-3 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-brand-500/20 transition text-center active:scale-[0.98]">
+            <i class="fa-solid fa-camera"></i> Abrir Câmera
+            <input type="file" id="camera-file-input" accept="image/*" capture="environment" class="hidden" onchange="handleCameraCapture(event)">
+          </label>
+          
+          <label class="py-3 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/60 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-600 cursor-pointer transition text-center active:scale-[0.98]">
+            <i class="fa-solid fa-upload"></i> Galeria/Arquivo
+            <input type="file" id="file-input" accept="image/*" class="hidden" onchange="handleFileUpload(event)">
+          </label>
+        </div>
+
+        <hr class="border-slate-200 dark:border-slate-700 my-1">
+
+        <!-- Formulário de Identificação do Canhoto -->
+        <div class="space-y-4">
+          <div>
+            <label for="nf-number" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Número da Carga <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-hashtag text-sm"></i>
+              </div>
+              <input type="text" id="nf-number" placeholder="Ex: NF-004921 ou Cliente X" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 dark:text-white transition">
+            </div>
+          </div>
+
+          <div>
+            <label for="format-select" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Formato</label>
+            <select id="format-select" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 dark:text-white">
+              <option value="image/jpeg">JPG (.jpg)</option>
+              <option value="image/png">PNG (.png)</option>
+              <option value="application/pdf">PDF Documento (.pdf)</option>
+            </select>
+          </div>
+
+          <!-- Botões Salvar e Baixar -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <button onclick="openCloudConfigModal()" class="py-2.5 px-4 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition active:scale-[0.98]">
+            <i class="fa-solid fa-cloud-arrow-up text-xs"></i> Enviar p/ Nuvem
+          </button>
+          <button onclick="downloadCurrent()" class="py-2.5 px-4 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-md shadow-brand-500/20 transition active:scale-[0.98]">
+            <i class="fa-solid fa-download text-xs"></i> Baixar Agora
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Painel Direito: Galeria e Histórico -->
+    <section class="lg:col-span-7 flex flex-col space-y-4">
+      
+      <!-- Barra Superior da Galeria: Busca e Ações em Lote -->
+      <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
+        
+        <!-- Campo de Busca -->
+        <div class="relative w-full sm:w-64">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+          </div>
+          <input type="text" id="search-input" oninput="filterGallery()" placeholder="Buscar por número..." class="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 dark:text-white">
+        </div>
+
+        <!-- Ações da Galeria -->
+        <div class="flex items-center space-x-2 w-full sm:w-auto justify-end flex-wrap gap-y-2">
+          <button onclick="saveToGalleryLocally()" class="py-2 px-3 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition" title="Guardar apenas na galeria local da sessão">
+            <i class="fa-solid fa-bookmark"></i> Guardar Local
+          </button>
+          <button onclick="openCloudConfigModal()" class="py-2 px-3 bg-brand-50 dark:bg-brand-950/40 hover:bg-brand-100 dark:hover:bg-brand-900/50 text-brand-700 dark:text-brand-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition" title="Configurar e Enviar todos para a Nuvem em massa">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Enviar p/ Nuvem
+          </button>
+          <button onclick="downloadAllZip()" class="py-2 px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition" title="Baixar todos os canhotos formatados em arquivo ZIP">
+            <i class="fa-solid fa-file-archive text-amber-500"></i> ZIP
+          </button>
+          <button onclick="clearGallery()" class="py-2 px-3 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition" title="Limpar Galeria da Sessão">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Container da Galeria de Canhotos -->
+      <div id="gallery-container" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 flex-1">
+        <!-- Itens injetados via JavaScript -->
+      </div>
+
+      <!-- Estado Vazio da Galeria -->
+      <div id="empty-gallery" class="hidden flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-12 flex flex-col items-center justify-center text-center">
+        <div class="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center text-slate-400 mb-3">
+          <i class="fa-solid fa-folder-open text-2xl"></i>
+        </div>
+        <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Nenhum canhoto na galeria</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs">Tire foto ou carregue arquivos para organizar e armazenar temporariamente aqui.</p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Visualizador Modal de Imagem (Lightbox) -->
+  <div id="modal-lightbox" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity">
+    <div class="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center">
+      
+      <!-- Botão Fechar -->
+      <button onclick="closeModal()" class="absolute -top-10 right-0 text-white/80 hover:text-white text-xl p-2">
+        <i class="fa-solid fa-xmark"></i> Fechar
+      </button>
+
+      <!-- Imagem Ampliada -->
+      <img id="modal-img" class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl border border-slate-800" src="" alt="Ampliação do Canhoto">
+
+      <!-- Informações e Ações do Modal -->
+      <div class="mt-4 flex flex-col sm:flex-row items-center justify-between w-full bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-white gap-3">
+        <div>
+          <h4 id="modal-title" class="font-mono text-sm font-bold text-brand-400"></h4>
+          <p id="modal-date" class="text-xs text-slate-400 mt-0.5"></p>
+        </div>
+        <button id="modal-download-btn" class="py-2 px-4 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold flex items-center gap-2">
+          <i class="fa-solid fa-download"></i> Baixar Imagem
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Configuração e Envio em Massa para a Nuvem -->
+  <div id="cloud-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-xl w-full p-6 border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col space-y-5">
+      
+      <!-- Cabeçalho do Modal -->
+      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-4">
+        <div class="flex items-center space-x-3">
+          <div class="bg-brand-100 dark:bg-brand-900/50 text-brand-600 dark:text-brand-400 p-2.5 rounded-xl">
+            <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-slate-900 dark:text-white">Envio em Massa para a Nuvem</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Sincronize os canhotos capturados com sua preferência</p>
+          </div>
+        </div>
+        <button onclick="closeCloudModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Passo 1: Configuração de Provedor -->
+      <div id="cloud-step-config" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Serviço de Nuvem de Preferência</label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <label class="border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-brand-500 dark:hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/50 dark:has-[:checked]:bg-brand-950/30 transition">
+              <input type="radio" name="cloud-provider" value="gdrive" checked class="hidden">
+              <i class="fa-brands fa-google-drive text-2xl text-emerald-500"></i>
+              <span class="text-xs font-medium text-slate-700 dark:text-slate-200">Google Drive</span>
+            </label>
+
+            <label class="border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-brand-500 dark:hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/50 dark:has-[:checked]:bg-brand-950/30 transition">
+              <input type="radio" name="cloud-provider" value="onedrive" class="hidden">
+              <i class="fa-brands fa-microsoft text-2xl text-blue-500"></i>
+              <span class="text-xs font-medium text-slate-700 dark:text-slate-200">OneDrive</span>
+            </label>
+
+            <label class="border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-brand-500 dark:hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/50 dark:has-[:checked]:bg-brand-950/30 transition">
+              <input type="radio" name="cloud-provider" value="terabox" class="hidden">
+              <i class="fa-solid fa-box text-2xl text-cyan-500"></i>
+              <span class="text-xs font-medium text-slate-700 dark:text-slate-200">TeraBox</span>
+            </label>
+
+            <label class="border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-brand-500 dark:hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/50 dark:has-[:checked]:bg-brand-950/30 transition">
+              <input type="radio" name="cloud-provider" value="webdav" class="hidden">
+              <i class="fa-solid fa-server text-2xl text-purple-500"></i>
+              <span class="text-xs font-medium text-slate-700 dark:text-slate-200">WebDAV / Pasta</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Pasta de Destino na Nuvem</label>
+          <input type="text" id="cloud-folder-path" value="/MeroLink/Canhotos_2026" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 dark:text-white">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Chave de Acesso / Token (Simulado)</label>
+          <input type="password" id="cloud-token" value="merolink_token_sec_984123" placeholder="Insira o token de autorização..." class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 dark:text-white">
+          <p class="text-[11px] text-slate-400 mt-1">O token autentica a sessão atual com o aplicativo escolhido de forma segura.</p>
+        </div>
+
+        <div class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-3 rounded-xl flex items-start space-x-3">
+          <i class="fa-solid fa-circle-info text-amber-500 text-sm mt-0.5"></i>
+          <p class="text-xs text-amber-800 dark:text-amber-300">
+            Itens na galeria atual: <span id="cloud-modal-count" class="font-bold">0</span> canhotos prontos para envio em lote.
+          </p>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-2">
+          <button onclick="closeCloudModal()" class="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition">
+            Cancelar
+          </button>
+          <button onclick="startCloudBulkUpload()" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-brand-500/20 flex items-center gap-2 transition">
+            <i class="fa-solid fa-play text-xs"></i> Iniciar Envio em Massa
+          </button>
+        </div>
+      </div>
+
+      <!-- Passo 2: Progresso do Envio em Massa -->
+      <div id="cloud-step-progress" class="hidden space-y-4">
+        <div class="space-y-2">
+          <div class="flex justify-between text-xs font-medium text-slate-700 dark:text-slate-300">
+            <span id="cloud-progress-status">Enviando arquivos...</span>
+            <span id="cloud-progress-percent">0%</span>
+          </div>
+          <!-- Barra de Progresso Geral -->
+          <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+            <div id="cloud-progress-bar" class="bg-brand-600 h-3 rounded-full transition-all duration-300 w-0"></div>
+          </div>
+        </div>
+
+        <!-- Lista de Status Individual por Arquivo -->
+        <div id="cloud-file-list" class="max-h-48 overflow-y-auto space-y-2 pr-1 border border-slate-100 dark:border-slate-700/60 p-2 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+          <!-- Injetado dinamicamente -->
+        </div>
+
+        <div id="cloud-finish-actions" class="hidden flex justify-end pt-2">
+          <button onclick="closeCloudModal()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl flex items-center gap-2 transition">
+            <i class="fa-solid fa-check"></i> Concluir e Fechar
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast Notificação -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 border border-slate-700 dark:border-slate-200 text-sm">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 dark:text-emerald-600 text-base"></i>
+    <span id="toast-message" class="font-medium">Mensagem de aviso</span>
+  </div>
+
+  <canvas id="hidden-canvas" class="hidden"></canvas>
+
+  <script>
+    // Estado da Aplicação
+    let capturedImageData = null;
+    let galleryItems = [];
+
+    // Inicialização da Aplicação
+    window.onload = () => {
+      renderGallery();
+    };
+
+    // Geração do nome formatado (Fixado sem prefixo)
+    function getFormattedFilename() {
+      const rawNumber = document.getElementById('nf-number').value.trim();
+      const format = document.getElementById('format-select').value;
+      let ext = '.jpg';
+      if (format === 'image/png') ext = '.png';
+      else if (format === 'application/pdf') ext = '.pdf';
+      
+      const cleanNumber = rawNumber ? rawNumber.replace(/[^a-zA-Z0-9_-]/g, '_') : 'SEM_NUMERO';
+      return `${cleanNumber}${ext}`;
+    }
+
+    // Captura direta via Câmera Nativa (Funciona em File://, HTTP e HTTPS sem restrições de MediaDevices)
+    function handleCameraCapture(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const nfInput = document.getElementById('nf-number');
+      if (!nfInput.value) {
+        const dataStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+        nfInput.value = `CANHOTO_${dataStr}`;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        capturedImageData = e.target.result;
+        const previewImg = document.getElementById('image-preview');
+        const placeholder = document.getElementById('preview-placeholder');
+        
+        previewImg.src = capturedImageData;
+        previewImg.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        
+        showToast("Foto capturada com sucesso!", "success");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Carregamento via Upload de Arquivo/Galeria
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const nfInput = document.getElementById('nf-number');
+      if (!nfInput.value) {
+        const rawName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+        nfInput.value = rawName;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        capturedImageData = e.target.result;
+        const previewImg = document.getElementById('image-preview');
+        const placeholder = document.getElementById('preview-placeholder');
+        
+        previewImg.src = capturedImageData;
+        previewImg.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        
+        showToast("Arquivo carregado com sucesso!", "success");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Converte uma imagem (dataURL) para um documento PDF (DataURL ou Blob)
+    async function convertImageToPdfDataUrl(imageDataUrl) {
+      const { jsPDF } = window.jspdf;
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = function() {
+          const imgWidth = img.width;
+          const imgHeight = img.height;
+          const orientation = imgWidth > imgHeight ? 'l' : 'p';
+          
+          const pdf = new jsPDF({
+            orientation: orientation,
+            unit: 'px',
+            format: [imgWidth, imgHeight]
+          });
+          
+          pdf.addImage(imageDataUrl, 'JPEG', 0, 0, imgWidth, imgHeight);
+          const pdfDataUrl = pdf.output('dataurlstring');
+          resolve(pdfDataUrl);
+        };
+        img.src = imageDataUrl;
+      });
+    }
+
+    // Guardar Imagem na Galeria Localmente
+    async function saveToGalleryLocally() {
+      if (!capturedImageData) {
+        showToast("Por favor, tire uma foto ou selecione um arquivo primeiro.", "error");
+        return;
+      }
+
+      const filename = getFormattedFilename();
+      const format = document.getElementById('format-select').value;
+      const nfNum = document.getElementById('nf-number').value.trim() || 'Sem Número';
+
+      let finalDataUrl = capturedImageData;
+      if (format === 'application/pdf') {
+        finalDataUrl = await convertImageToPdfDataUrl(capturedImageData);
+      }
+
+      const newItem = {
+        id: Date.now(),
+        filename: filename,
+        nfNumber: nfNum,
+        dataUrl: finalDataUrl,
+        rawImage: capturedImageData,
+        format: format,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        dateStr: new Date().toLocaleDateString('pt-BR'),
+        synced: false
+      };
+
+      galleryItems.unshift(newItem);
+      renderGallery();
+      showToast("Canhoto guardado na galeria local!", "success");
+    }
+
+    // Abre o Modal de Configuração de Nuvem
+    async function openCloudConfigModal() {
+      // Se houver uma foto atual e o usuário ainda não guardou na galeria, guardamos automaticamente antes de abrir o modal
+      if (capturedImageData) {
+        const filename = getFormattedFilename();
+        const format = document.getElementById('format-select').value;
+        const nfNum = document.getElementById('nf-number').value.trim() || 'Sem Número';
+        
+        // Verifica se já não foi adicionado o exato mesmo dado por último para evitar duplicidade
+        const alreadyExists = galleryItems.length > 0 && (galleryItems[0].rawImage === capturedImageData || galleryItems[0].dataUrl === capturedImageData);
+        if (!alreadyExists) {
+          let finalDataUrl = capturedImageData;
+          if (format === 'application/pdf') {
+            finalDataUrl = await convertImageToPdfDataUrl(capturedImageData);
+          }
+          const newItem = {
+            id: Date.now(),
+            filename: filename,
+            nfNumber: nfNum,
+            dataUrl: finalDataUrl,
+            rawImage: capturedImageData,
+            format: format,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            dateStr: new Date().toLocaleDateString('pt-BR'),
+            synced: false
+          };
+          galleryItems.unshift(newItem);
+          renderGallery();
+        }
+      }
+
+      if (galleryItems.length === 0) {
+        showToast("Nenhum canhoto capturado ou na galeria para envio.", "error");
+        return;
+      }
+
+      document.getElementById('cloud-modal-count').innerText = galleryItems.length;
+      document.getElementById('cloud-step-config').classList.remove('hidden');
+      document.getElementById('cloud-step-progress').classList.add('hidden');
+      document.getElementById('cloud-modal').classList.remove('hidden');
+    }
+
+    function closeCloudModal() {
+      document.getElementById('cloud-modal').classList.add('hidden');
+    }
+
+    // Simulação de Envio em Massa para a Nuvem
+    async function startCloudBulkUpload() {
+      const token = document.getElementById('cloud-token').value.trim();
+      if (!token) {
+        showToast("Por favor, insira o token ou credencial de acesso.", "error");
+        return;
+      }
+
+      const selectedProvider = document.querySelector('input[name="cloud-provider"]:checked').value;
+      const folderPath = document.getElementById('cloud-folder-path').value;
+
+      document.getElementById('cloud-step-config').classList.add('hidden');
+      document.getElementById('cloud-step-progress').classList.remove('hidden');
+      document.getElementById('cloud-finish-actions').classList.add('hidden');
+
+      const progressBar = document.getElementById('cloud-progress-bar');
+      const progressStatus = document.getElementById('cloud-progress-status');
+      const progressPercent = document.getElementById('cloud-progress-percent');
+      const fileListContainer = document.getElementById('cloud-file-list');
+
+      // Monta lista inicial de arquivos no modal de progresso
+      fileListContainer.innerHTML = galleryItems.map((item, idx) => `
+        <div id="upload-row-${item.id}" class="flex items-center justify-between text-xs bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+          <div class="flex items-center space-x-2 truncate">
+            <i class="fa-solid fa-file-image text-brand-500"></i>
+            <span class="font-mono font-medium truncate text-slate-700 dark:text-slate-200">${item.filename}</span>
+          </div>
+          <span id="upload-status-${item.id}" class="text-slate-400 font-medium whitespace-nowrap ml-2">Aguardando...</span>
+        </div>
+      `).join('');
+
+      let totalFiles = galleryItems.length;
+      let completedFiles = 0;
+
+      for (let i = 0; i < galleryItems.length; i++) {
+        let item = galleryItems[i];
+        let statusSpan = document.getElementById(`upload-status-${item.id}`);
+        
+        statusSpan.className = "text-amber-500 font-medium whitespace-nowrap ml-2 animate-pulse";
+        statusSpan.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Enviando...';
+        progressStatus.innerText = `Enviando arquivo ${i + 1} de ${totalFiles} (${item.filename})...`;
+
+        // Simula tempo de rede para upload (ex: 600ms a 1200ms por arquivo)
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        statusSpan.className = "text-emerald-500 font-medium whitespace-nowrap ml-2";
+        statusSpan.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Sincronizado';
+        
+        item.synced = true;
+        completedFiles++;
+
+        let percent = Math.round((completedFiles / totalFiles) * 100);
+        progressBar.style.width = `${percent}%`;
+        progressPercent.innerText = `${percent}%`;
+      }
+
+      progressStatus.innerText = `Envio em massa concluído com sucesso para ${selectedProvider.toUpperCase()} (${folderPath})!`;
+      document.getElementById('cloud-finish-actions').classList.remove('hidden');
+      renderGallery();
+      showToast("Todos os canhotos foram enviados para a nuvem!", "success");
+    }
+
+    // Download Individual Imediato
+    async function downloadCurrent() {
+      if (!capturedImageData) {
+        showToast("Selecione ou capture uma imagem antes de baixar.", "error");
+        return;
+      }
+
+      const filename = getFormattedFilename();
+      const format = document.getElementById('format-select').value;
+
+      let fileDataUrl = capturedImageData;
+      if (format === 'application/pdf') {
+        fileDataUrl = await convertImageToPdfDataUrl(capturedImageData);
+      }
+
+      triggerDownload(fileDataUrl, filename);
+      showToast(`Download iniciado: ${filename}`, "success");
+    }
+
+    function triggerDownload(dataUrl, filename) {
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // Renderizar Galeria
+    function renderGallery(itemsToRender = galleryItems) {
+      const container = document.getElementById('gallery-container');
+      const emptyState = document.getElementById('empty-gallery');
+      const totalCount = document.getElementById('total-count');
+
+      totalCount.innerText = galleryItems.length;
+
+      if (itemsToRender.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      container.innerHTML = itemsToRender.map(item => {
+        const previewSrc = item.rawImage || item.dataUrl;
+        const isPdf = item.format === 'application/pdf' || item.filename.endsWith('.pdf');
+        
+        return `
+        <div class="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700/80 shadow-sm hover:shadow-md transition flex flex-col group">
+          <div class="relative aspect-[4/3] bg-slate-950 overflow-hidden cursor-pointer" onclick="openModal(${item.id})">
+            <img src="${previewSrc}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="${item.filename}">
+            ${isPdf ? '<span class="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow flex items-center gap-1"><i class="fa-solid fa-file-pdf"></i> PDF</span>' : ''}
+            ${item.synced ? '<span class="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow flex items-center gap-1"><i class="fa-solid fa-cloud"></i> Nuvem</span>' : ''}
+            <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white font-medium text-xs">
+              <i class="fa-solid fa-expand text-lg mr-1"></i> Visualizar
+            </div>
+          </div>
+          <div class="p-3 flex-1 flex flex-col justify-between">
+            <div>
+              <p class="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 truncate" title="${item.filename}">${item.filename}</p>
+              <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">${item.timestamp} • ${item.dateStr}</p>
+            </div>
+            <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+              <button onclick="triggerDownload('${item.dataUrl}', '${item.filename}')" class="text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 flex items-center gap-1">
+                <i class="fa-solid fa-download"></i> Baixar
+              </button>
+              <button onclick="deleteItem(${item.id})" class="text-xs text-red-500 hover:text-red-700 p-1" title="Excluir">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      }).join('');
+    }
+
+    // Filtrar Galeria
+    function filterGallery() {
+      const query = document.getElementById('search-input').value.toLowerCase().trim();
+      const filtered = galleryItems.filter(item => 
+        item.filename.toLowerCase().includes(query) || 
+        item.nfNumber.toLowerCase().includes(query)
+      );
+      renderGallery(filtered);
+    }
+
+    // Deletar item individual
+    function deleteItem(id) {
+      galleryItems = galleryItems.filter(item => item.id !== id);
+      renderGallery();
+      showToast("Canhoto removido da galeria.", "info");
+    }
+
+    // Limpar toda a galeria
+    function clearGallery() {
+      if (galleryItems.length === 0) return;
+      if (confirm("Tem certeza que deseja limpar a galeria de canhotos?")) {
+        galleryItems = [];
+        renderGallery();
+        showToast("Galeria limpa com sucesso.", "info");
+      }
+    }
+
+    // Modal Lightbox
+    function openModal(id) {
+      const item = galleryItems.find(i => i.id === id);
+      if (!item) return;
+
+      document.getElementById('modal-img').src = item.rawImage || item.dataUrl;
+      document.getElementById('modal-title').innerText = item.filename;
+      document.getElementById('modal-date').innerText = `Capturado em ${item.dateStr} às ${item.timestamp}`;
+      
+      const downloadBtn = document.getElementById('modal-download-btn');
+      downloadBtn.onclick = () => triggerDownload(item.dataUrl, item.filename);
+
+      document.getElementById('modal-lightbox').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('modal-lightbox').classList.add('hidden');
+    }
+
+    // Download em Lote (ZIP) usando JSZip
+    async function downloadAllZip() {
+      if (galleryItems.length === 0) {
+        showToast("Nenhum canhoto armazenado para baixar.", "error");
+        return;
+      }
+
+      showToast("Gerando arquivo ZIP...", "info");
+
+      const zip = new JSZip();
+      const folder = zip.folder("canhotos_merolink");
+
+      galleryItems.forEach(item => {
+        const base64Data = item.dataUrl.split(',')[1];
+        folder.file(item.filename, base64Data, { base64: true });
+      });
+
+      try {
+        const content = await zip.generateAsync({ type: "blob" });
+        const zipUrl = URL.createObjectURL(content);
+        const dataHoje = new Date().toISOString().slice(0,10);
+        triggerDownload(zipUrl, `MeroLink_Canhotos_${dataHoje}.zip`);
+        showToast("Download do lote completo finalizado!", "success");
+      } catch (err) {
+        showToast("Erro ao criar pacote ZIP.", "error");
+        console.error(err);
+      }
+    }
+
+    // Alternar Tema (Claro/Escuro)
+    function toggleDarkMode() {
+      document.documentElement.classList.toggle('dark');
+    }
+
+    // Exibição de Toast
+    function showToast(message, type = "success") {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toast-message');
+      const toastIcon = document.getElementById('toast-icon');
+
+      toastMessage.innerText = message;
+
+      if (type === "error") {
+        toastIcon.className = "fa-solid fa-circle-exclamation text-red-500 text-base";
+      } else if (type === "info") {
+        toastIcon.className = "fa-solid fa-circle-info text-blue-500 text-base";
+      } else {
+        toastIcon.className = "fa-solid fa-circle-check text-emerald-500 text-base";
+      }
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
